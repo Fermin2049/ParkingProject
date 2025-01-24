@@ -1,0 +1,6 @@
+@FinalMarzo.net_HostAddress = http://localhost:5020
+
+GET {{FinalMarzo.net_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
