@@ -8,14 +8,10 @@ namespace FinalMarzo.net.Data;
 
 public partial class MyDbContext : DbContext
 {
-    public MyDbContext()
-    {
-    }
+    public MyDbContext() { }
 
     public MyDbContext(DbContextOptions<MyDbContext> options)
-        : base(options)
-    {
-    }
+        : base(options) { }
 
     public virtual DbSet<Cliente> Clientes { get; set; }
 
@@ -32,14 +28,25 @@ public partial class MyDbContext : DbContext
     public virtual DbSet<Usuario> Usuarios { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseMySql("server=localhost;database=parking;user=root", Microsoft.EntityFrameworkCore.ServerVersion.Parse("10.4.28-mariadb"));
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                .AddJsonFile("appsettings.json")
+                .Build();
+
+            var connectionString = configuration.GetConnectionString("DefaultConnection");
+            optionsBuilder.UseMySql(
+                connectionString,
+                Microsoft.EntityFrameworkCore.ServerVersion.Parse("10.4.28-mariadb")
+            );
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder
-            .UseCollation("utf8mb4_general_ci")
-            .HasCharSet("utf8mb4");
+        modelBuilder.UseCollation("utf8mb4_general_ci").HasCharSet("utf8mb4");
 
         modelBuilder.Entity<Cliente>(entity =>
         {
@@ -53,25 +60,16 @@ public partial class MyDbContext : DbContext
 
             entity.HasIndex(e => e.VehiculoPlaca, "vehiculoPlaca").IsUnique();
 
-            entity.Property(e => e.IdCliente)
-                .HasColumnType("int(11)")
-                .HasColumnName("idCliente");
-            entity.Property(e => e.Email)
-                .HasMaxLength(100)
-                .HasColumnName("email");
-            entity.Property(e => e.FechaRegistro)
+            entity.Property(e => e.IdCliente).HasColumnType("int(11)").HasColumnName("idCliente");
+            entity.Property(e => e.Email).HasMaxLength(100).HasColumnName("email");
+            entity
+                .Property(e => e.FechaRegistro)
                 .HasDefaultValueSql("current_timestamp()")
                 .HasColumnType("datetime")
                 .HasColumnName("fechaRegistro");
-            entity.Property(e => e.Nombre)
-                .HasMaxLength(100)
-                .HasColumnName("nombre");
-            entity.Property(e => e.Telefono)
-                .HasMaxLength(20)
-                .HasColumnName("telefono");
-            entity.Property(e => e.VehiculoPlaca)
-                .HasMaxLength(20)
-                .HasColumnName("vehiculoPlaca");
+            entity.Property(e => e.Nombre).HasMaxLength(100).HasColumnName("nombre");
+            entity.Property(e => e.Telefono).HasMaxLength(20).HasColumnName("telefono");
+            entity.Property(e => e.VehiculoPlaca).HasMaxLength(20).HasColumnName("vehiculoPlaca");
         });
 
         modelBuilder.Entity<Efmigrationshistory>(entity =>
@@ -92,25 +90,25 @@ public partial class MyDbContext : DbContext
 
             entity.HasIndex(e => e.NumeroEspacio, "numeroEspacio").IsUnique();
 
-            entity.Property(e => e.IdEspacio)
-                .HasColumnType("int(11)")
-                .HasColumnName("idEspacio");
-            entity.Property(e => e.Estado)
+            entity.Property(e => e.IdEspacio).HasColumnType("int(11)").HasColumnName("idEspacio");
+            entity
+                .Property(e => e.Estado)
                 .HasDefaultValueSql("'Disponible'")
                 .HasColumnType("enum('Disponible','Ocupado','Reservado')")
                 .HasColumnName("estado");
-            entity.Property(e => e.FechaActualizacion)
+            entity
+                .Property(e => e.FechaActualizacion)
                 .ValueGeneratedOnAddOrUpdate()
                 .HasDefaultValueSql("current_timestamp()")
                 .HasColumnType("datetime")
                 .HasColumnName("fechaActualizacion");
-            entity.Property(e => e.NumeroEspacio)
+            entity
+                .Property(e => e.NumeroEspacio)
                 .HasColumnType("int(11)")
                 .HasColumnName("numeroEspacio");
-            entity.Property(e => e.Sector)
-                .HasMaxLength(50)
-                .HasColumnName("sector");
-            entity.Property(e => e.TipoEspacio)
+            entity.Property(e => e.Sector).HasMaxLength(50).HasColumnName("sector");
+            entity
+                .Property(e => e.TipoEspacio)
                 .HasDefaultValueSql("'Normal'")
                 .HasColumnType("enum('Normal','Discapacitados')")
                 .HasColumnName("tipoEspacio");
@@ -126,31 +124,35 @@ public partial class MyDbContext : DbContext
 
             entity.HasIndex(e => e.IdEspacio, "idEspacio");
 
-            entity.Property(e => e.IdHistorial)
+            entity
+                .Property(e => e.IdHistorial)
                 .HasColumnType("int(11)")
                 .HasColumnName("idHistorial");
-            entity.Property(e => e.Estado)
+            entity
+                .Property(e => e.Estado)
                 .HasDefaultValueSql("'Activo'")
                 .HasColumnType("enum('Activo','Completado')")
                 .HasColumnName("estado");
-            entity.Property(e => e.FechaEntrada)
+            entity
+                .Property(e => e.FechaEntrada)
                 .HasColumnType("datetime")
                 .HasColumnName("fechaEntrada");
-            entity.Property(e => e.FechaSalida)
+            entity
+                .Property(e => e.FechaSalida)
                 .HasColumnType("datetime")
                 .HasColumnName("fechaSalida");
-            entity.Property(e => e.IdCliente)
-                .HasColumnType("int(11)")
-                .HasColumnName("idCliente");
-            entity.Property(e => e.IdEspacio)
-                .HasColumnType("int(11)")
-                .HasColumnName("idEspacio");
+            entity.Property(e => e.IdCliente).HasColumnType("int(11)").HasColumnName("idCliente");
+            entity.Property(e => e.IdEspacio).HasColumnType("int(11)").HasColumnName("idEspacio");
 
-            entity.HasOne(d => d.IdClienteNavigation).WithMany(p => p.Historialestacionamientos)
+            entity
+                .HasOne(d => d.IdClienteNavigation)
+                .WithMany(p => p.Historialestacionamientos)
                 .HasForeignKey(d => d.IdCliente)
                 .HasConstraintName("historialestacionamiento_ibfk_1");
 
-            entity.HasOne(d => d.IdEspacioNavigation).WithMany(p => p.Historialestacionamientos)
+            entity
+                .HasOne(d => d.IdEspacioNavigation)
+                .WithMany(p => p.Historialestacionamientos)
                 .HasForeignKey(d => d.IdEspacio)
                 .HasConstraintName("historialestacionamiento_ibfk_2");
         });
@@ -163,28 +165,27 @@ public partial class MyDbContext : DbContext
 
             entity.HasIndex(e => e.IdCliente, "idCliente");
 
-            entity.Property(e => e.IdPago)
-                .HasColumnType("int(11)")
-                .HasColumnName("idPago");
-            entity.Property(e => e.Estado)
+            entity.Property(e => e.IdPago).HasColumnType("int(11)").HasColumnName("idPago");
+            entity
+                .Property(e => e.Estado)
                 .HasDefaultValueSql("'Exitoso'")
                 .HasColumnType("enum('Exitoso','Fallido')")
                 .HasColumnName("estado");
-            entity.Property(e => e.FechaPago)
+            entity
+                .Property(e => e.FechaPago)
                 .HasDefaultValueSql("current_timestamp()")
                 .HasColumnType("datetime")
                 .HasColumnName("fechaPago");
-            entity.Property(e => e.IdCliente)
-                .HasColumnType("int(11)")
-                .HasColumnName("idCliente");
-            entity.Property(e => e.MetodoPago)
+            entity.Property(e => e.IdCliente).HasColumnType("int(11)").HasColumnName("idCliente");
+            entity
+                .Property(e => e.MetodoPago)
                 .HasColumnType("enum('Efectivo','Tarjeta','Transferencia')")
                 .HasColumnName("metodoPago");
-            entity.Property(e => e.Monto)
-                .HasPrecision(10, 2)
-                .HasColumnName("monto");
+            entity.Property(e => e.Monto).HasPrecision(10, 2).HasColumnName("monto");
 
-            entity.HasOne(d => d.IdClienteNavigation).WithMany(p => p.Pagos)
+            entity
+                .HasOne(d => d.IdClienteNavigation)
+                .WithMany(p => p.Pagos)
                 .HasForeignKey(d => d.IdCliente)
                 .HasConstraintName("pagos_ibfk_1");
         });
@@ -199,31 +200,32 @@ public partial class MyDbContext : DbContext
 
             entity.HasIndex(e => e.IdEspacio, "idEspacio");
 
-            entity.Property(e => e.IdReserva)
-                .HasColumnType("int(11)")
-                .HasColumnName("idReserva");
-            entity.Property(e => e.Estado)
+            entity.Property(e => e.IdReserva).HasColumnType("int(11)").HasColumnName("idReserva");
+            entity
+                .Property(e => e.Estado)
                 .HasDefaultValueSql("'Activa'")
                 .HasColumnType("enum('Activa','Cancelada','Expirada')")
                 .HasColumnName("estado");
-            entity.Property(e => e.FechaExpiracion)
+            entity
+                .Property(e => e.FechaExpiracion)
                 .HasColumnType("datetime")
                 .HasColumnName("fechaExpiracion");
-            entity.Property(e => e.FechaReserva)
+            entity
+                .Property(e => e.FechaReserva)
                 .HasColumnType("datetime")
                 .HasColumnName("fechaReserva");
-            entity.Property(e => e.IdCliente)
-                .HasColumnType("int(11)")
-                .HasColumnName("idCliente");
-            entity.Property(e => e.IdEspacio)
-                .HasColumnType("int(11)")
-                .HasColumnName("idEspacio");
+            entity.Property(e => e.IdCliente).HasColumnType("int(11)").HasColumnName("idCliente");
+            entity.Property(e => e.IdEspacio).HasColumnType("int(11)").HasColumnName("idEspacio");
 
-            entity.HasOne(d => d.IdClienteNavigation).WithMany(p => p.Reservas)
+            entity
+                .HasOne(d => d.IdClienteNavigation)
+                .WithMany(p => p.Reservas)
                 .HasForeignKey(d => d.IdCliente)
                 .HasConstraintName("reservas_ibfk_1");
 
-            entity.HasOne(d => d.IdEspacioNavigation).WithMany(p => p.Reservas)
+            entity
+                .HasOne(d => d.IdEspacioNavigation)
+                .WithMany(p => p.Reservas)
                 .HasForeignKey(d => d.IdEspacio)
                 .HasConstraintName("reservas_ibfk_2");
         });
@@ -236,27 +238,22 @@ public partial class MyDbContext : DbContext
 
             entity.HasIndex(e => e.Email, "email").IsUnique();
 
-            entity.Property(e => e.IdUsuario)
-                .HasColumnType("int(11)")
-                .HasColumnName("idUsuario");
-            entity.Property(e => e.Contrasena)
-                .HasMaxLength(255)
-                .HasColumnName("contrasena");
-            entity.Property(e => e.Email)
-                .HasMaxLength(100)
-                .HasColumnName("email");
-            entity.Property(e => e.Estado)
+            entity.Property(e => e.IdUsuario).HasColumnType("int(11)").HasColumnName("idUsuario");
+            entity.Property(e => e.Contrasena).HasMaxLength(255).HasColumnName("contrasena");
+            entity.Property(e => e.Email).HasMaxLength(100).HasColumnName("email");
+            entity
+                .Property(e => e.Estado)
                 .HasDefaultValueSql("'Activo'")
                 .HasColumnType("enum('Activo','Inactivo')")
                 .HasColumnName("estado");
-            entity.Property(e => e.FechaRegistro)
+            entity
+                .Property(e => e.FechaRegistro)
                 .HasDefaultValueSql("current_timestamp()")
                 .HasColumnType("datetime")
                 .HasColumnName("fechaRegistro");
-            entity.Property(e => e.Nombre)
-                .HasMaxLength(100)
-                .HasColumnName("nombre");
-            entity.Property(e => e.Rol)
+            entity.Property(e => e.Nombre).HasMaxLength(100).HasColumnName("nombre");
+            entity
+                .Property(e => e.Rol)
                 .HasColumnType("enum('Administrador','Empleado')")
                 .HasColumnName("rol");
         });

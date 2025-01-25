@@ -17,7 +17,8 @@ public partial class Espaciosestacionamiento
 
     public DateTime? FechaActualizacion { get; set; }
 
-    public virtual ICollection<Historialestacionamiento> Historialestacionamientos { get; set; } = new List<Historialestacionamiento>();
+    public virtual ICollection<Historialestacionamiento> Historialestacionamientos { get; set; } =
+        new List<Historialestacionamiento>();
 
     public virtual ICollection<Reserva> Reservas { get; set; } = new List<Reserva>();
 }

@@ -17,7 +17,8 @@ public partial class Cliente
 
     public DateTime? FechaRegistro { get; set; }
 
-    public virtual ICollection<Historialestacionamiento> Historialestacionamientos { get; set; } = new List<Historialestacionamiento>();
+    public virtual ICollection<Historialestacionamiento> Historialestacionamientos { get; set; } =
+        new List<Historialestacionamiento>();
 
     public virtual ICollection<Pago> Pagos { get; set; } = new List<Pago>();
 
