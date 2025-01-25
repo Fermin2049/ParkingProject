@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using FinalMarzo.net.Data;
+using FinalMarzo.net.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -38,8 +39,10 @@ builder
         {
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(key),
-            ValidateIssuer = false, // Opcional: Puedes habilitar validación del issuer si lo necesitas
-            ValidateAudience = false, // Opcional: Puedes habilitar validación de la audiencia si lo necesitas
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidIssuer = builder.Configuration["TokenAuthentication:Issuer"],
+            ValidAudience = builder.Configuration["TokenAuthentication:Audience"],
             ValidateLifetime = true,
         };
     });
@@ -70,6 +73,36 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Parking Management API", Version = "v1" });
 });
+
+// Agregar servicios personalizados
+builder.Services.AddScoped<TokenService>();
+var salt = builder.Configuration["Salt"];
+if (string.IsNullOrEmpty(salt))
+{
+    throw new InvalidOperationException("Salt is not configured.");
+}
+builder.Services.AddScoped<PasswordService>(_ => new PasswordService(salt));
+var smtpHost = builder.Configuration["SMTP_Host"];
+if (string.IsNullOrEmpty(smtpHost))
+{
+    throw new InvalidOperationException("SMTP_Host is not configured.");
+}
+var smtpUser = builder.Configuration["SMTP_User"];
+if (string.IsNullOrEmpty(smtpUser))
+{
+    throw new InvalidOperationException("SMTP_User is not configured.");
+}
+var smtpPass = builder.Configuration["SMTP_Pass"];
+if (string.IsNullOrEmpty(smtpPass))
+{
+    throw new InvalidOperationException("SMTP_Pass is not configured.");
+}
+builder.Services.AddScoped<EmailService>(_ => new EmailService(
+    smtpHost,
+    int.TryParse(builder.Configuration["SMTP_Port"], out var smtpPort) ? smtpPort : 25,
+    smtpUser,
+    smtpPass
+));
 
 // Construir la aplicación
 var app = builder.Build();
