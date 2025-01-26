@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using FinalMarzo.net.Data;
+using FinalMarzo.net.Middlewares; // Importar los Middlewares
 using FinalMarzo.net.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -117,6 +118,10 @@ if (app.Environment.IsDevelopment())
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Parking Management API V1");
     });
 }
+
+// Registrar Middlewares personalizados
+app.UseMiddleware<ExceptionMiddleware>(); // Middleware para manejo de excepciones
+app.UseMiddleware<LoggingMiddleware>(); // Middleware para logging
 
 // Configurar el middleware
 app.UseHttpsRedirection();
