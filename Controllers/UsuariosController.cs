@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using FinalMarzo.net.Data;
 using FinalMarzo.net.Models;
+using FinalMarzo.net.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,10 +16,12 @@ namespace FinalMarzo.net.Controllers
     public class UsuariosController : ControllerBase
     {
         private readonly MyDbContext _context;
+        private readonly PasswordService _passwordService;
 
-        public UsuariosController(MyDbContext context)
+        public UsuariosController(MyDbContext context, PasswordService passwordService)
         {
             _context = context;
+            _passwordService = passwordService;
         }
 
         // GET: api/Usuarios
@@ -56,6 +59,9 @@ namespace FinalMarzo.net.Controllers
             usuario.FechaRegistro = DateTime.Now;
             usuario.Estado = "Activo";
 
+            // Hasear la contraseña
+            usuario.Contrasena = _passwordService.HashPassword(usuario.Contrasena);
+
             _context.Usuarios.Add(usuario);
             await _context.SaveChangesAsync();
 
@@ -77,10 +83,17 @@ namespace FinalMarzo.net.Controllers
                 return NotFound("Usuario no encontrado.");
             }
 
+            // Actualizar los campos básicos
             usuarioExistente.Nombre = usuario.Nombre;
             usuarioExistente.Email = usuario.Email;
             usuarioExistente.Rol = usuario.Rol;
             usuarioExistente.Estado = usuario.Estado;
+
+            // Verificar si se envió una nueva contraseña
+            if (!string.IsNullOrEmpty(usuario.Contrasena))
+            {
+                usuarioExistente.Contrasena = _passwordService.HashPassword(usuario.Contrasena);
+            }
 
             _context.Entry(usuarioExistente).State = EntityState.Modified;
 
