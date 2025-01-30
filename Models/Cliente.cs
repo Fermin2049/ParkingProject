@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace FinalMarzo.net.Models;
 
-public partial class Cliente
+public class Cliente
 {
     public int IdCliente { get; set; }
 
@@ -16,6 +16,8 @@ public partial class Cliente
     public string VehiculoPlaca { get; set; } = null!;
 
     public DateTime? FechaRegistro { get; set; }
+
+    public string Password { get; set; } = null!; // Agrega esta línea
 
     public virtual ICollection<Historialestacionamiento> Historialestacionamientos { get; set; } =
         new List<Historialestacionamiento>();

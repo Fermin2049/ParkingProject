@@ -15,8 +15,6 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<Cliente> Clientes { get; set; }
 
-    public virtual DbSet<Efmigrationshistory> Efmigrationshistories { get; set; }
-
     public virtual DbSet<Espaciosestacionamiento> Espaciosestacionamientos { get; set; }
 
     public virtual DbSet<Historialestacionamiento> Historialestacionamientos { get; set; }
@@ -70,16 +68,6 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Nombre).HasMaxLength(100).HasColumnName("nombre");
             entity.Property(e => e.Telefono).HasMaxLength(20).HasColumnName("telefono");
             entity.Property(e => e.VehiculoPlaca).HasMaxLength(20).HasColumnName("vehiculoPlaca");
-        });
-
-        modelBuilder.Entity<Efmigrationshistory>(entity =>
-        {
-            entity.HasKey(e => e.MigrationId).HasName("PRIMARY");
-
-            entity.ToTable("__efmigrationshistory");
-
-            entity.Property(e => e.MigrationId).HasMaxLength(150);
-            entity.Property(e => e.ProductVersion).HasMaxLength(32);
         });
 
         modelBuilder.Entity<Espaciosestacionamiento>(entity =>
