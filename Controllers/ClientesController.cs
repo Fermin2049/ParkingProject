@@ -10,7 +10,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinalMarzo.net.Controllers
 {
-    //[Authorize] // Descomentar si quieres que todos los endpoints requieran autenticación
     [Route("api/[controller]")]
     [ApiController]
     public class ClientesController : ControllerBase
@@ -22,17 +21,30 @@ namespace FinalMarzo.net.Controllers
             _context = context;
         }
 
-        // ✅ Obtener todos los clientes (solo si es necesario)
+        // ✅ Obtener todos los clientes (Solo Administradores)
         [HttpGet]
-        [Authorize(Roles = "Administrador")] // Solo admin puede ver todos los clientes
+        [Authorize(Roles = "Administrador")]
         public async Task<ActionResult<IEnumerable<Cliente>>> GetClientes()
         {
             return await _context.Clientes.ToListAsync();
         }
 
+        // ✅ Obtener un cliente específico (Solo Administradores)
+        [HttpGet("{idCliente}")]
+        [Authorize(Roles = "Administrador")]
+        public async Task<ActionResult<Cliente>> GetClienteById(int idCliente)
+        {
+            var cliente = await _context.Clientes.FindAsync(idCliente);
+            if (cliente == null)
+            {
+                return NotFound("Cliente no encontrado.");
+            }
+            return cliente;
+        }
+
         // ✅ Obtener los datos del cliente autenticado
         [HttpGet("me")]
-        [Authorize] // Solo clientes autenticados pueden acceder
+        [Authorize(Roles = "Cliente")]
         public async Task<ActionResult<Cliente>> GetMyData()
         {
             var email = User.FindFirst(ClaimTypes.Name)?.Value;
@@ -46,7 +58,7 @@ namespace FinalMarzo.net.Controllers
             return cliente;
         }
 
-        // ✅ Registrar un nuevo cliente
+        // ✅ Registrar un nuevo cliente (Público, sin autorización)
         [HttpPost]
         public async Task<ActionResult<Cliente>> PostCliente(Cliente cliente)
         {
@@ -66,7 +78,7 @@ namespace FinalMarzo.net.Controllers
 
         // ✅ Actualizar los datos del cliente autenticado
         [HttpPut("me")]
-        [Authorize]
+        [Authorize(Roles = "Cliente")]
         public async Task<IActionResult> PutMyData(Cliente cliente)
         {
             var email = User.FindFirst(ClaimTypes.Name)?.Value;
@@ -107,9 +119,32 @@ namespace FinalMarzo.net.Controllers
             return NoContent();
         }
 
+        // ✅ Actualizar cualquier cliente (Solo Administradores)
+        [HttpPut("{idCliente}")]
+        [Authorize(Roles = "Administrador")]
+        public async Task<IActionResult> PutCliente(int idCliente, Cliente cliente)
+        {
+            if (idCliente != cliente.IdCliente)
+                return BadRequest("El ID del cliente no coincide.");
+
+            var clienteExistente = await _context.Clientes.FindAsync(idCliente);
+            if (clienteExistente == null)
+                return NotFound("Cliente no encontrado.");
+
+            clienteExistente.Nombre = cliente.Nombre;
+            clienteExistente.Telefono = cliente.Telefono;
+            clienteExistente.Email = cliente.Email;
+            clienteExistente.VehiculoPlaca = cliente.VehiculoPlaca;
+
+            _context.Entry(clienteExistente).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
         // ✅ Eliminar la cuenta del cliente autenticado
         [HttpDelete("me")]
-        [Authorize]
+        [Authorize(Roles = "Cliente")]
         public async Task<IActionResult> DeleteMyAccount()
         {
             var email = User.FindFirst(ClaimTypes.Name)?.Value;
@@ -126,9 +161,22 @@ namespace FinalMarzo.net.Controllers
                 return NotFound("Cliente no encontrado.");
 
             if (cliente.Reservas.Any(r => r.Estado == "Activa"))
-            {
                 return BadRequest("No puedes eliminar tu cuenta si tienes reservas activas.");
-            }
+
+            _context.Clientes.Remove(cliente);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        // ✅ Eliminar cualquier cliente (Solo Administradores)
+        [HttpDelete("{idCliente}")]
+        [Authorize(Roles = "Administrador")]
+        public async Task<IActionResult> DeleteCliente(int idCliente)
+        {
+            var cliente = await _context.Clientes.FindAsync(idCliente);
+            if (cliente == null)
+                return NotFound("Cliente no encontrado.");
 
             _context.Clientes.Remove(cliente);
             await _context.SaveChangesAsync();

@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinalMarzo.net.Controllers
 {
-    [Authorize]
+    [Authorize] // 🔹 Todos los endpoints requieren autenticación
     [Route("api/[controller]")]
     [ApiController]
     public class ReservasController : ControllerBase
@@ -22,50 +22,97 @@ namespace FinalMarzo.net.Controllers
             _context = context;
         }
 
-        // GET: api/Reservas/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Reserva>> GetReserva(int id)
+        // ✅ Obtener todas las reservas (Solo Administradores y Empleados)
+        [HttpGet]
+        [Authorize(Roles = "Administrador,Empleado")]
+        public async Task<ActionResult<IEnumerable<Reserva>>> GetReservas()
+        {
+            return await _context
+                .Reservas.Include(r => r.IdClienteNavigation)
+                .Include(r => r.IdEspacioNavigation)
+                .ToListAsync();
+        }
+
+        // ✅ Obtener reservas de un cliente específico (Solo Administradores y Empleados)
+        [HttpGet("cliente/{idCliente}")]
+        [Authorize(Roles = "Administrador,Empleado")]
+        public async Task<ActionResult<IEnumerable<Reserva>>> GetReservasByCliente(int idCliente)
+        {
+            var reservas = await _context
+                .Reservas.Where(r => r.IdCliente == idCliente)
+                .Include(r => r.IdEspacioNavigation)
+                .ToListAsync();
+
+            if (!reservas.Any())
+            {
+                return NotFound("No se encontraron reservas para este cliente.");
+            }
+
+            return reservas;
+        }
+
+        // ✅ Obtener reservas del cliente autenticado
+        [HttpGet("me")]
+        [Authorize(Roles = "Cliente")]
+        public async Task<ActionResult<IEnumerable<Reserva>>> GetMyReservas()
         {
             var email = User.FindFirst(ClaimTypes.Name)?.Value;
             if (email == null)
-            {
                 return Unauthorized();
-            }
 
             var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Email == email);
             if (cliente == null)
-            {
                 return NotFound("Cliente no encontrado.");
-            }
 
+            var reservas = await _context
+                .Reservas.Where(r => r.IdCliente == cliente.IdCliente)
+                .Include(r => r.IdEspacioNavigation)
+                .ToListAsync();
+
+            return reservas;
+        }
+
+        // ✅ Obtener una reserva específica (Solo Administradores, Empleados y Cliente Propietario)
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Reserva>> GetReserva(int id)
+        {
             var reserva = await _context
                 .Reservas.Include(r => r.IdClienteNavigation)
                 .Include(r => r.IdEspacioNavigation)
-                .FirstOrDefaultAsync(r => r.IdReserva == id && r.IdCliente == cliente.IdCliente);
+                .FirstOrDefaultAsync(r => r.IdReserva == id);
 
             if (reserva == null)
             {
                 return NotFound("Reserva no encontrada.");
             }
 
+            // Si es un cliente, solo puede acceder a su propia reserva
+            var email = User.FindFirst(ClaimTypes.Name)?.Value;
+            var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Email == email);
+
+            if (
+                User.IsInRole("Cliente")
+                && (cliente == null || reserva.IdCliente != cliente.IdCliente)
+            )
+            {
+                return Forbid();
+            }
+
             return reserva;
         }
 
-        // POST: api/Reservas
+        // ✅ Crear una nueva reserva (Solo Clientes)
         [HttpPost]
+        [Authorize(Roles = "Cliente")]
         public async Task<ActionResult<Reserva>> PostReserva(Reserva reserva)
         {
             var email = User.FindFirst(ClaimTypes.Name)?.Value;
             if (email == null)
-            {
                 return Unauthorized();
-            }
 
             var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Email == email);
             if (cliente == null)
-            {
                 return NotFound("Cliente no encontrado.");
-            }
 
             // Verificar que el espacio esté disponible
             var espacio = await _context.Espaciosestacionamientos.FirstOrDefaultAsync(e =>
@@ -86,26 +133,21 @@ namespace FinalMarzo.net.Controllers
             return CreatedAtAction(nameof(GetReserva), new { id = reserva.IdReserva }, reserva);
         }
 
-        // PUT: api/Reservas/5
+        // ✅ Modificar una reserva (Solo Clientes dueños de la reserva)
         [HttpPut("{id}")]
+        [Authorize(Roles = "Cliente")]
         public async Task<IActionResult> PutReserva(int id, Reserva reserva)
         {
             if (id != reserva.IdReserva)
-            {
                 return BadRequest();
-            }
 
             var email = User.FindFirst(ClaimTypes.Name)?.Value;
             if (email == null)
-            {
                 return Unauthorized();
-            }
 
             var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Email == email);
             if (cliente == null)
-            {
                 return NotFound("Cliente no encontrado.");
-            }
 
             var existingReserva = await _context.Reservas.FirstOrDefaultAsync(r =>
                 r.IdReserva == id && r.IdCliente == cliente.IdCliente
@@ -120,49 +162,29 @@ namespace FinalMarzo.net.Controllers
             existingReserva.FechaExpiracion = reserva.FechaExpiracion;
 
             _context.Entry(existingReserva).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.Reservas.Any(e => e.IdReserva == id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        // DELETE: api/Reservas/5
+        // ✅ Cancelar o eliminar una reserva (Clientes pueden cancelar su reserva, Administradores pueden eliminar cualquier reserva)
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteReserva(int id)
         {
-            var email = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (email == null)
-            {
-                return Unauthorized();
-            }
-
-            var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Email == email);
-            if (cliente == null)
-            {
-                return NotFound("Cliente no encontrado.");
-            }
-
-            var reserva = await _context.Reservas.FirstOrDefaultAsync(r =>
-                r.IdReserva == id && r.IdCliente == cliente.IdCliente
-            );
-
+            var reserva = await _context.Reservas.FindAsync(id);
             if (reserva == null)
-            {
                 return NotFound("Reserva no encontrada.");
+
+            var email = User.FindFirst(ClaimTypes.Name)?.Value;
+            var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Email == email);
+
+            // Si es un cliente, solo puede eliminar su propia reserva
+            if (
+                User.IsInRole("Cliente")
+                && (cliente == null || reserva.IdCliente != cliente.IdCliente)
+            )
+            {
+                return Forbid();
             }
 
             var espacio = await _context.Espaciosestacionamientos.FirstOrDefaultAsync(e =>

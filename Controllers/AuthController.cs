@@ -30,7 +30,7 @@ namespace FinalMarzo.net.Controllers
             _passwordService = passwordService;
         }
 
-        // ✅ LOGIN CLIENTE (CORREGIDO)
+        // ✅ LOGIN CLIENTE
         [HttpPost("login-cliente")] // 🔹 URL: /api/auth/login-cliente
         public async Task<IActionResult> LoginCliente([FromBody] LoginRequest model)
         {
@@ -42,18 +42,44 @@ namespace FinalMarzo.net.Controllers
                 return BadRequest("Email y contraseña son requeridos.");
 
             var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Email == model.Email);
-            if (cliente == null)
-                return Unauthorized("Correo o contraseña incorrectos.");
-
-            if (!_passwordService.VerifyPassword(model.Password, cliente.Password))
+            if (
+                cliente == null
+                || !_passwordService.VerifyPassword(model.Password, cliente.Password)
+            )
                 return Unauthorized("Correo o contraseña incorrectos.");
 
             // Generar Token
-            if (cliente.Email == null)
-                return Unauthorized("Correo o contraseña incorrectos.");
+            if (string.IsNullOrEmpty(cliente.Email))
+                return BadRequest("El email del cliente no puede ser nulo o vacío.");
 
             var token = _tokenService.GenerateJwtToken(cliente.Email, "Cliente", cliente.IdCliente);
+            return Ok(new { token });
+        }
 
+        // ✅ LOGIN ADMINISTRADOR O EMPLEADO
+        [HttpPost("login-usuario")] // 🔹 URL: /api/auth/login-usuario
+        public async Task<IActionResult> LoginUsuario([FromBody] LoginRequest model)
+        {
+            if (
+                model == null
+                || string.IsNullOrEmpty(model.Email)
+                || string.IsNullOrEmpty(model.Password)
+            )
+                return BadRequest("Email y contraseña son requeridos.");
+
+            var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Email == model.Email);
+            if (
+                usuario == null
+                || !_passwordService.VerifyPassword(model.Password, usuario.Contrasena)
+            )
+                return Unauthorized("Correo o contraseña incorrectos.");
+
+            // Generar Token con el rol correcto
+            var token = _tokenService.GenerateJwtToken(
+                usuario.Email,
+                usuario.Rol,
+                usuario.IdUsuario
+            );
             return Ok(new { token });
         }
     }

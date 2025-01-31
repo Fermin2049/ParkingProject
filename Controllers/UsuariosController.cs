@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinalMarzo.net.Controllers
 {
-    [Authorize(Roles = "Administrador")]
+    [Authorize(Roles = "Administrador")] // 🔹 Solo los administradores pueden acceder
     [Route("api/[controller]")]
     [ApiController]
     public class UsuariosController : ControllerBase
@@ -24,19 +24,18 @@ namespace FinalMarzo.net.Controllers
             _passwordService = passwordService;
         }
 
-        // GET: api/Usuarios
+        // ✅ Obtener todos los usuarios (Solo Administradores)
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Usuario>>> GetUsuarios()
         {
             return await _context.Usuarios.ToListAsync();
         }
 
-        // GET: api/Usuarios/5
+        // ✅ Obtener un usuario por ID (Solo Administradores)
         [HttpGet("{id}")]
         public async Task<ActionResult<Usuario>> GetUsuario(int id)
         {
             var usuario = await _context.Usuarios.FindAsync(id);
-
             if (usuario == null)
             {
                 return NotFound("Usuario no encontrado.");
@@ -45,13 +44,12 @@ namespace FinalMarzo.net.Controllers
             return usuario;
         }
 
-        // POST: api/Usuarios
+        // ✅ Crear un nuevo usuario (Solo Administradores)
         [HttpPost]
         public async Task<ActionResult<Usuario>> PostUsuario(Usuario usuario)
         {
             // Verificar si el email ya está registrado
-            var emailExistente = await _context.Usuarios.AnyAsync(u => u.Email == usuario.Email);
-            if (emailExistente)
+            if (await _context.Usuarios.AnyAsync(u => u.Email == usuario.Email))
             {
                 return BadRequest("El email ya está registrado.");
             }
@@ -59,7 +57,7 @@ namespace FinalMarzo.net.Controllers
             usuario.FechaRegistro = DateTime.Now;
             usuario.Estado = "Activo";
 
-            // Hasear la contraseña
+            // 🔹 Hashear la contraseña antes de guardar
             usuario.Contrasena = _passwordService.HashPassword(usuario.Contrasena);
 
             _context.Usuarios.Add(usuario);
@@ -68,7 +66,7 @@ namespace FinalMarzo.net.Controllers
             return CreatedAtAction(nameof(GetUsuario), new { id = usuario.IdUsuario }, usuario);
         }
 
-        // PUT: api/Usuarios/5
+        // ✅ Modificar un usuario (Solo Administradores)
         [HttpPut("{id}")]
         public async Task<IActionResult> PutUsuario(int id, Usuario usuario)
         {
@@ -89,7 +87,7 @@ namespace FinalMarzo.net.Controllers
             usuarioExistente.Rol = usuario.Rol;
             usuarioExistente.Estado = usuario.Estado;
 
-            // Verificar si se envió una nueva contraseña
+            // 🔹 Verificar si se envió una nueva contraseña y hashearla
             if (!string.IsNullOrEmpty(usuario.Contrasena))
             {
                 usuarioExistente.Contrasena = _passwordService.HashPassword(usuario.Contrasena);
@@ -116,7 +114,7 @@ namespace FinalMarzo.net.Controllers
             return NoContent();
         }
 
-        // DELETE: api/Usuarios/5
+        // ✅ Eliminar un usuario (Solo Administradores)
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUsuario(int id)
         {

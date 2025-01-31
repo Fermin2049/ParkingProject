@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using FinalMarzo.net.Data;
 using FinalMarzo.net.Models;
@@ -9,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinalMarzo.net.Controllers
 {
-    [Authorize]
+    [Authorize] // 🔹 Todos los endpoints requieren autenticación
     [Route("api/[controller]")]
     [ApiController]
     public class PagosController : ControllerBase
@@ -21,15 +22,17 @@ namespace FinalMarzo.net.Controllers
             _context = context;
         }
 
-        // GET: api/Pagos
+        // ✅ Obtener TODOS los pagos (Solo Administradores y Empleados)
         [HttpGet]
+        [Authorize(Roles = "Administrador,Empleado")]
         public async Task<ActionResult<IEnumerable<Pago>>> GetPagos()
         {
             return await _context.Pagos.Include(p => p.IdClienteNavigation).ToListAsync();
         }
 
-        // GET: api/Pagos/Cliente/5
-        [HttpGet("Cliente/{idCliente}")]
+        // ✅ Obtener pagos de un cliente específico (Solo Administradores y Empleados)
+        [HttpGet("cliente/{idCliente}")]
+        [Authorize(Roles = "Administrador,Empleado")]
         public async Task<ActionResult<IEnumerable<Pago>>> GetPagosByCliente(int idCliente)
         {
             var pagos = await _context
@@ -45,25 +48,30 @@ namespace FinalMarzo.net.Controllers
             return pagos;
         }
 
-        // GET: api/Pagos/Estado/Exitoso
-        [HttpGet("Estado/{estado}")]
-        public async Task<ActionResult<IEnumerable<Pago>>> GetPagosByEstado(string estado)
+        // ✅ Obtener los pagos del cliente autenticado
+        [HttpGet("me")]
+        [Authorize(Roles = "Cliente")]
+        public async Task<ActionResult<IEnumerable<Pago>>> GetMyPagos()
         {
+            var email = User.FindFirst(ClaimTypes.Name)?.Value;
+            if (email == null)
+                return Unauthorized();
+
+            var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Email == email);
+            if (cliente == null)
+                return NotFound("Cliente no encontrado.");
+
             var pagos = await _context
-                .Pagos.Where(p => p.Estado == estado)
+                .Pagos.Where(p => p.IdCliente == cliente.IdCliente)
                 .Include(p => p.IdClienteNavigation)
                 .ToListAsync();
-
-            if (!pagos.Any())
-            {
-                return NotFound("No se encontraron pagos con el estado especificado.");
-            }
 
             return pagos;
         }
 
-        // GET: api/Pagos/5
+        // ✅ Obtener un pago específico (Solo Administradores y Empleados)
         [HttpGet("{id}")]
+        [Authorize(Roles = "Administrador,Empleado")]
         public async Task<ActionResult<Pago>> GetPago(int id)
         {
             var pago = await _context
@@ -78,8 +86,9 @@ namespace FinalMarzo.net.Controllers
             return pago;
         }
 
-        // POST: api/Pagos
+        // ✅ Registrar un nuevo pago (Solo Empleados)
         [HttpPost]
+        [Authorize(Roles = "Empleado")]
         public async Task<ActionResult<Pago>> PostPago(Pago pago)
         {
             var cliente = await _context.Clientes.FindAsync(pago.IdCliente);
@@ -97,8 +106,9 @@ namespace FinalMarzo.net.Controllers
             return CreatedAtAction(nameof(GetPago), new { id = pago.IdPago }, pago);
         }
 
-        // PUT: api/Pagos/5
+        // ✅ Modificar un pago (Solo Administradores)
         [HttpPut("{id}")]
+        [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> PutPago(int id, Pago pago)
         {
             if (id != pago.IdPago)
@@ -137,8 +147,9 @@ namespace FinalMarzo.net.Controllers
             return NoContent();
         }
 
-        // DELETE: api/Pagos/5
+        // ✅ Eliminar un pago (Solo Administradores)
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> DeletePago(int id)
         {
             var pago = await _context.Pagos.FindAsync(id);

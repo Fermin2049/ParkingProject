@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinalMarzo.net.Controllers
 {
-    [Authorize]
+    [Authorize] // 🔹 Todos los endpoints requieren autenticación
     [Route("api/[controller]")]
     [ApiController]
     public class EspaciosEstacionamientoController : ControllerBase
@@ -21,8 +21,9 @@ namespace FinalMarzo.net.Controllers
             _context = context;
         }
 
-        // GET: api/EspaciosEstacionamiento
+        // ✅ Obtener todos los espacios (Administradores y Empleados)
         [HttpGet]
+        [Authorize(Roles = "Administrador,Empleado")]
         public async Task<
             ActionResult<IEnumerable<Espaciosestacionamiento>>
         > GetEspaciosEstacionamiento()
@@ -30,8 +31,9 @@ namespace FinalMarzo.net.Controllers
             return await _context.Espaciosestacionamientos.ToListAsync();
         }
 
-        // GET: api/EspaciosEstacionamiento/5
+        // ✅ Obtener un espacio específico (Administradores y Empleados)
         [HttpGet("{id}")]
+        [Authorize(Roles = "Administrador,Empleado")]
         public async Task<ActionResult<Espaciosestacionamiento>> GetEspacioEstacionamiento(int id)
         {
             var espacio = await _context.Espaciosestacionamientos.FindAsync(id);
@@ -44,18 +46,19 @@ namespace FinalMarzo.net.Controllers
             return espacio;
         }
 
-        // POST: api/EspaciosEstacionamiento
+        // ✅ Crear un nuevo espacio (Solo Administradores)
         [HttpPost]
+        [Authorize(Roles = "Administrador")]
         public async Task<ActionResult<Espaciosestacionamiento>> PostEspacioEstacionamiento(
             Espaciosestacionamiento espacio
         )
         {
             // Validar si el número de espacio ya existe
-            var espacioExistente = await _context.Espaciosestacionamientos.FirstOrDefaultAsync(e =>
-                e.NumeroEspacio == espacio.NumeroEspacio
-            );
-
-            if (espacioExistente != null)
+            if (
+                await _context.Espaciosestacionamientos.AnyAsync(e =>
+                    e.NumeroEspacio == espacio.NumeroEspacio
+                )
+            )
             {
                 return BadRequest("El número de espacio ya está en uso.");
             }
@@ -70,8 +73,9 @@ namespace FinalMarzo.net.Controllers
             );
         }
 
-        // PUT: api/EspaciosEstacionamiento/5
+        // ✅ Actualizar un espacio (Solo Administradores)
         [HttpPut("{id}")]
+        [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> PutEspacioEstacionamiento(
             int id,
             Espaciosestacionamiento espacio
@@ -82,7 +86,6 @@ namespace FinalMarzo.net.Controllers
                 return BadRequest("El ID del espacio no coincide.");
             }
 
-            // Validar si el espacio existe
             var espacioExistente = await _context.Espaciosestacionamientos.FindAsync(id);
             if (espacioExistente == null)
             {
@@ -117,8 +120,9 @@ namespace FinalMarzo.net.Controllers
             return NoContent();
         }
 
-        // DELETE: api/EspaciosEstacionamiento/5
+        // ✅ Eliminar un espacio (Solo Administradores)
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> DeleteEspacioEstacionamiento(int id)
         {
             var espacio = await _context.Espaciosestacionamientos.FindAsync(id);

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using FinalMarzo.net.Data;
 using FinalMarzo.net.Models;
@@ -9,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinalMarzo.net.Controllers
 {
-    [Authorize]
+    [Authorize] // 🔹 Todos los endpoints requieren autenticación
     [Route("api/[controller]")]
     [ApiController]
     public class HistorialEstacionamientoController : ControllerBase
@@ -21,8 +22,9 @@ namespace FinalMarzo.net.Controllers
             _context = context;
         }
 
-        // GET: api/HistorialEstacionamiento
+        // ✅ Obtener TODO el historial de estacionamiento (Solo Administradores y Empleados)
         [HttpGet]
+        [Authorize(Roles = "Administrador,Empleado")]
         public async Task<
             ActionResult<IEnumerable<Historialestacionamiento>>
         > GetHistorialEstacionamiento()
@@ -33,27 +35,50 @@ namespace FinalMarzo.net.Controllers
                 .ToListAsync();
         }
 
-        // GET: api/HistorialEstacionamiento/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Historialestacionamiento>> GetHistorialEstacionamiento(
-            int id
-        )
+        // ✅ Obtener historial de estacionamiento de un cliente específico (Solo Administradores y Empleados)
+        [HttpGet("cliente/{idCliente}")]
+        [Authorize(Roles = "Administrador,Empleado")]
+        public async Task<
+            ActionResult<IEnumerable<Historialestacionamiento>>
+        > GetHistorialByCliente(int idCliente)
         {
             var historial = await _context
-                .Historialestacionamientos.Include(h => h.IdClienteNavigation)
+                .Historialestacionamientos.Where(h => h.IdCliente == idCliente)
                 .Include(h => h.IdEspacioNavigation)
-                .FirstOrDefaultAsync(h => h.IdHistorial == id);
+                .ToListAsync();
 
-            if (historial == null)
+            if (!historial.Any())
             {
-                return NotFound("El historial no fue encontrado.");
+                return NotFound("No hay historial para este cliente.");
             }
 
             return historial;
         }
 
-        // POST: api/HistorialEstacionamiento
+        // ✅ Obtener historial del cliente autenticado
+        [HttpGet("me")]
+        [Authorize(Roles = "Cliente")]
+        public async Task<ActionResult<IEnumerable<Historialestacionamiento>>> GetMyHistorial()
+        {
+            var email = User.FindFirst(ClaimTypes.Name)?.Value;
+            if (email == null)
+                return Unauthorized();
+
+            var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Email == email);
+            if (cliente == null)
+                return NotFound("Cliente no encontrado.");
+
+            var historial = await _context
+                .Historialestacionamientos.Where(h => h.IdCliente == cliente.IdCliente)
+                .Include(h => h.IdEspacioNavigation)
+                .ToListAsync();
+
+            return historial;
+        }
+
+        // ✅ Registrar entrada de un vehículo (Solo Empleados)
         [HttpPost]
+        [Authorize(Roles = "Empleado")]
         public async Task<ActionResult<Historialestacionamiento>> PostHistorialEstacionamiento(
             Historialestacionamiento historial
         )
@@ -82,8 +107,9 @@ namespace FinalMarzo.net.Controllers
             );
         }
 
-        // PUT: api/HistorialEstacionamiento/Salida/5
-        [HttpPut("Salida/{id}")]
+        // ✅ Registrar salida de un vehículo (Solo Empleados)
+        [HttpPut("salida/{id}")]
+        [Authorize(Roles = "Empleado")]
         public async Task<IActionResult> RegistrarSalida(int id)
         {
             var historial = await _context
@@ -112,8 +138,9 @@ namespace FinalMarzo.net.Controllers
             return NoContent();
         }
 
-        // DELETE: api/HistorialEstacionamiento/5
+        // ✅ Eliminar un historial de estacionamiento (Solo Administradores)
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> DeleteHistorialEstacionamiento(int id)
         {
             var historial = await _context.Historialestacionamientos.FindAsync(id);
