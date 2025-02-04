@@ -15,6 +15,9 @@ public partial class Usuario
 
     public string Rol { get; set; } = null!;
 
+    public string? ResetToken { get; set; }
+    public DateTime? ResetTokenExpiry { get; set; }
+
     public DateTime? FechaRegistro { get; set; }
 
     public string? Estado { get; set; }

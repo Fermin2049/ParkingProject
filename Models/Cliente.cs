@@ -17,7 +17,10 @@ public class Cliente
 
     public DateTime? FechaRegistro { get; set; }
 
-    public string Password { get; set; } = null!; // Agrega esta línea
+    public string Password { get; set; } = null!;
+
+    public string? ResetToken { get; set; }
+    public DateTime? ResetTokenExpiry { get; set; }
 
     public virtual ICollection<Historialestacionamiento> Historialestacionamientos { get; set; } =
         new List<Historialestacionamiento>();

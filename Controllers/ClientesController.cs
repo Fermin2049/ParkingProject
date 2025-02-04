@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using FinalMarzo.net.Data;
 using FinalMarzo.net.Models;
+using FinalMarzo.net.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,10 +16,12 @@ namespace FinalMarzo.net.Controllers
     public class ClientesController : ControllerBase
     {
         private readonly MyDbContext _context;
+        private readonly EmailService _emailService;
 
-        public ClientesController(MyDbContext context)
+        public ClientesController(MyDbContext context, EmailService emailService)
         {
             _context = context;
+            _emailService = emailService;
         }
 
         // ✅ Obtener todos los clientes (Solo Administradores)
@@ -182,6 +185,44 @@ namespace FinalMarzo.net.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // ✅ Enviar correo de recuperación de contraseña
+        [HttpPost("recuperar-password")]
+        public async Task<IActionResult> RecuperarPassword(
+            [FromBody] RecuperarPasswordRequest request
+        )
+        {
+            if (string.IsNullOrEmpty(request.Email))
+                return BadRequest("El email es obligatorio.");
+
+            var cliente = await _context.Clientes.FirstOrDefaultAsync(c =>
+                c.Email == request.Email
+            );
+            if (cliente == null)
+                return NotFound("No existe un cliente con ese correo.");
+
+            // Generar un token temporal (puede ser un código aleatorio o un enlace con un JWT)
+            string resetToken = Guid.NewGuid().ToString();
+
+            // Enviar el correo con el enlace de recuperación
+            string subject = "Recuperación de Contraseña";
+            string body =
+                $"Hola {cliente.Nombre},\n\n"
+                + "Haz clic en el siguiente enlace para restablecer tu contraseña:\n\n"
+                + $"http://localhost:3000/reset-password?token={resetToken}\n\n"
+                + "Si no solicitaste este cambio, ignora este mensaje.";
+
+            if (cliente.Email != null)
+            {
+                await _emailService.SendEmailAsync(cliente.Email, subject, body);
+            }
+            else
+            {
+                return BadRequest("El email del cliente es nulo.");
+            }
+
+            return Ok("Se ha enviado un correo con instrucciones para recuperar tu contraseña.");
         }
     }
 }

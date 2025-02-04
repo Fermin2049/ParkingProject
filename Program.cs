@@ -98,11 +98,11 @@ if (string.IsNullOrEmpty(smtpPass))
 {
     throw new InvalidOperationException("SMTP_Pass is not configured.");
 }
-builder.Services.AddScoped<EmailService>(_ => new EmailService(
-    smtpHost,
-    int.TryParse(builder.Configuration["SMTP_Port"], out var smtpPort) ? smtpPort : 25,
-    smtpUser,
-    smtpPass
+
+// Registrar EmailService usando IConfiguration y ILogger
+builder.Services.AddScoped<EmailService>(sp => new EmailService(
+    sp.GetRequiredService<IConfiguration>(),
+    sp.GetRequiredService<ILogger<EmailService>>()
 ));
 
 // Construir la aplicación
