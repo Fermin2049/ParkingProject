@@ -35,13 +35,15 @@ namespace FinalMarzo.net.Middlewares
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
-            return context.Response.WriteAsync(
+            var result = System.Text.Json.JsonSerializer.Serialize(
                 new
                 {
                     StatusCode = context.Response.StatusCode,
                     Message = "An unexpected error occurred. Please try again later.",
-                }.ToString()
+                }
             );
+
+            return context.Response.WriteAsync(result);
         }
     }
 }

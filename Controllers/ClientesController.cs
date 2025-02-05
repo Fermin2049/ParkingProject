@@ -202,14 +202,15 @@ namespace FinalMarzo.net.Controllers
             if (cliente == null)
                 return NotFound("No existe un cliente con ese correo.");
 
-            // Generar un token temporal (puede ser un código aleatorio o un enlace con un JWT)
             string resetToken = Guid.NewGuid().ToString();
+            cliente.ResetToken = resetToken;
+            cliente.ResetTokenExpiry = DateTime.UtcNow.AddHours(1);
 
-            // Enviar el correo con el enlace de recuperación
+            await _context.SaveChangesAsync();
+
             string subject = "Recuperación de Contraseña";
             string body =
-                $"Hola {cliente.Nombre},\n\n"
-                + "Haz clic en el siguiente enlace para restablecer tu contraseña:\n\n"
+                $"Hola {cliente.Nombre},\n\nHaz clic en el siguiente enlace para restablecer tu contraseña:\n\n"
                 + $"http://localhost:3000/reset-password?token={resetToken}\n\n"
                 + "Si no solicitaste este cambio, ignora este mensaje.";
 
@@ -219,10 +220,45 @@ namespace FinalMarzo.net.Controllers
             }
             else
             {
-                return BadRequest("El email del cliente es nulo.");
+                return BadRequest("El cliente no tiene un correo electrónico registrado.");
             }
 
             return Ok("Se ha enviado un correo con instrucciones para recuperar tu contraseña.");
         }
+
+        [HttpPost("restablecer-password")]
+        public async Task<IActionResult> RestablecerPassword(
+            [FromBody] RestablecerPasswordRequest request
+        )
+        {
+            if (string.IsNullOrEmpty(request.Token) || string.IsNullOrEmpty(request.NewPassword))
+                return BadRequest("El token y la nueva contraseña son obligatorios.");
+
+            var cliente = await _context.Clientes.FirstOrDefaultAsync(c =>
+                c.ResetToken == request.Token
+            );
+
+            if (cliente == null || cliente.ResetTokenExpiry < DateTime.UtcNow)
+                return BadRequest("El token es inválido o ha expirado.");
+
+            cliente.Password = request.NewPassword; // Deberías encriptar esta contraseña
+            cliente.ResetToken = null;
+            cliente.ResetTokenExpiry = null;
+
+            await _context.SaveChangesAsync();
+
+            return Ok("Contraseña restablecida con éxito.");
+        }
+    }
+
+    public class RecuperarPasswordRequest
+    {
+        public string? Email { get; set; }
+    }
+
+    public class RestablecerPasswordRequest
+    {
+        public string? Token { get; set; }
+        public string? NewPassword { get; set; }
     }
 }

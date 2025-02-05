@@ -79,7 +79,6 @@ namespace FinalMarzo.net.Controllers
             return Ok(new { token });
         }
 
-        // ✅ SOLICITAR RECUPERACIÓN DE CONTRASEÑA (Para clientes y usuarios)
         [HttpPost("solicitar-recuperacion")]
         public async Task<IActionResult> SolicitarRecuperacion(
             [FromBody] ResetPasswordRequest request
@@ -88,7 +87,6 @@ namespace FinalMarzo.net.Controllers
             if (string.IsNullOrEmpty(request.Email))
                 return BadRequest("El email es obligatorio.");
 
-            // Buscar en la tabla de Clientes y Usuarios
             var usuario = await _context.Usuarios.FirstOrDefaultAsync(u =>
                 u.Email == request.Email
             );
@@ -99,9 +97,8 @@ namespace FinalMarzo.net.Controllers
             if (usuario == null && cliente == null)
                 return NotFound("No se encontró una cuenta con este email.");
 
-            // Generar Token
             var resetToken = Guid.NewGuid().ToString();
-            var expiry = DateTime.UtcNow.AddHours(1); // Token expira en 1 hora
+            var expiry = DateTime.UtcNow.AddHours(1);
 
             if (usuario != null)
             {
@@ -116,7 +113,6 @@ namespace FinalMarzo.net.Controllers
 
             await _context.SaveChangesAsync();
 
-            // Enviar Email con Token
             string resetLink = $"https://tuaplicacion.com/reset-password?token={resetToken}";
             string body =
                 $"Haz clic en el siguiente enlace para restablecer tu contraseña: {resetLink}";
@@ -126,7 +122,6 @@ namespace FinalMarzo.net.Controllers
             return Ok("Se ha enviado un enlace de recuperación a tu correo.");
         }
 
-        // ✅ RESTABLECER CONTRASEÑA CON TOKEN
         [HttpPost("restablecer-contrasena")]
         public async Task<IActionResult> RestablecerContrasena(
             [FromBody] ResetPasswordConfirm request
@@ -141,6 +136,20 @@ namespace FinalMarzo.net.Controllers
             var cliente = await _context.Clientes.FirstOrDefaultAsync(c =>
                 c.ResetToken == request.Token
             );
+
+            Console.WriteLine($"🔹 Token recibido: {request.Token}");
+            Console.WriteLine($"🔹 Fecha actual UTC: {DateTime.UtcNow}");
+
+            if (usuario != null)
+            {
+                usuario.ResetTokenExpiry = usuario.ResetTokenExpiry?.ToUniversalTime();
+                Console.WriteLine($"🔹 Token Usuario Expiry: {usuario.ResetTokenExpiry}");
+            }
+            if (cliente != null)
+            {
+                cliente.ResetTokenExpiry = cliente.ResetTokenExpiry?.ToUniversalTime();
+                Console.WriteLine($"🔹 Token Cliente Expiry: {cliente.ResetTokenExpiry}");
+            }
 
             if (usuario == null && cliente == null)
                 return NotFound("Token inválido o expirado.");
@@ -168,6 +177,12 @@ namespace FinalMarzo.net.Controllers
 
             await _context.SaveChangesAsync();
             return Ok("Contraseña restablecida con éxito.");
+        }
+
+        [HttpGet("server-time")]
+        public IActionResult GetServerTime()
+        {
+            return Ok(new { ServerTimeUtc = DateTime.UtcNow, ServerTimeLocal = DateTime.Now });
         }
     }
 
