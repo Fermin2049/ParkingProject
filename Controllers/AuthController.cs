@@ -137,20 +137,6 @@ namespace FinalMarzo.net.Controllers
                 c.ResetToken == request.Token
             );
 
-            Console.WriteLine($"🔹 Token recibido: {request.Token}");
-            Console.WriteLine($"🔹 Fecha actual UTC: {DateTime.UtcNow}");
-
-            if (usuario != null)
-            {
-                usuario.ResetTokenExpiry = usuario.ResetTokenExpiry?.ToUniversalTime();
-                Console.WriteLine($"🔹 Token Usuario Expiry: {usuario.ResetTokenExpiry}");
-            }
-            if (cliente != null)
-            {
-                cliente.ResetTokenExpiry = cliente.ResetTokenExpiry?.ToUniversalTime();
-                Console.WriteLine($"🔹 Token Cliente Expiry: {cliente.ResetTokenExpiry}");
-            }
-
             if (usuario == null && cliente == null)
                 return NotFound("Token inválido o expirado.");
 
