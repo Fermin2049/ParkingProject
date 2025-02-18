@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using FinalMarzo.net.Data;
 using FinalMarzo.net.Models;
 using FinalMarzo.net.Services;
+using Google.Apis.Auth;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -165,6 +166,35 @@ namespace FinalMarzo.net.Controllers
             return Ok("Contraseña restablecida con éxito.");
         }
 
+        [HttpPost("login-google")]
+        public async Task<IActionResult> LoginWithGoogle([FromBody] GoogleLoginRequest request)
+        {
+            var validPayload = await GoogleJsonWebSignature.ValidateAsync(request.GoogleIdToken);
+            if (validPayload == null)
+            {
+                return Unauthorized("Google authentication failed.");
+            }
+
+            var email = validPayload.Email;
+            var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Email == email);
+
+            if (cliente == null)
+            {
+                cliente = new Cliente
+                {
+                    Email = email,
+                    Nombre = validPayload.Name,
+                    FechaRegistro = DateTime.UtcNow,
+                };
+
+                _context.Clientes.Add(cliente);
+                await _context.SaveChangesAsync();
+            }
+
+            var token = _tokenService.GenerateJwtToken(cliente.Email, "Cliente", cliente.IdCliente);
+            return Ok(new { token });
+        }
+
         [HttpGet("server-time")]
         public IActionResult GetServerTime()
         {
@@ -188,5 +218,10 @@ namespace FinalMarzo.net.Controllers
     {
         public string? Token { get; set; }
         public string? NewPassword { get; set; }
+    }
+
+    public class GoogleLoginRequest
+    {
+        public string? GoogleIdToken { get; set; }
     }
 }

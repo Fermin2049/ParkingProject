@@ -17,11 +17,17 @@ namespace FinalMarzo.net.Controllers
     {
         private readonly MyDbContext _context;
         private readonly EmailService _emailService;
+        private readonly PasswordService _passwordService;
 
-        public ClientesController(MyDbContext context, EmailService emailService)
+        public ClientesController(
+            MyDbContext context,
+            EmailService emailService,
+            PasswordService passwordService
+        )
         {
             _context = context;
             _emailService = emailService;
+            _passwordService = passwordService;
         }
 
         // ✅ Obtener todos los clientes (Solo Administradores)
@@ -63,16 +69,54 @@ namespace FinalMarzo.net.Controllers
 
         // ✅ Registrar un nuevo cliente (Público, sin autorización)
         [HttpPost]
-        public async Task<ActionResult<Cliente>> PostCliente(Cliente cliente)
+        public async Task<ActionResult<Cliente>> PostCliente(
+            [FromBody] ClienteRegistroRequest request
+        )
         {
+            if (request == null || string.IsNullOrEmpty(request.HcaptchaToken))
+            {
+                return BadRequest("hCaptcha token is required.");
+            }
+
+            // Verificar hCaptcha antes de procesar el registro
+            var hCaptchaService = new HCaptchaService(new HttpClient());
+            bool isValidCaptcha = await hCaptchaService.ValidateHCaptchaAsync(
+                request.HcaptchaToken
+            );
+
+            if (!isValidCaptcha)
+            {
+                Console.WriteLine("❌ hCaptcha verification failed.");
+                return BadRequest("Invalid hCaptcha verification.");
+            }
+
             // Validar que el teléfono y la placa no estén duplicados
-            if (await _context.Clientes.AnyAsync(c => c.Telefono == cliente.Telefono))
+            if (await _context.Clientes.AnyAsync(c => c.Telefono == request.Telefono))
+            {
                 return BadRequest("El teléfono ya está registrado.");
+            }
 
-            if (await _context.Clientes.AnyAsync(c => c.VehiculoPlaca == cliente.VehiculoPlaca))
+            if (await _context.Clientes.AnyAsync(c => c.VehiculoPlaca == request.VehiculoPlaca))
+            {
                 return BadRequest("La placa del vehículo ya está registrada.");
+            }
 
-            cliente.FechaRegistro = DateTime.Now;
+            // Crear el objeto Cliente con los datos recibidos
+            var cliente = new Cliente
+            {
+                Nombre = request.Nombre ?? throw new ArgumentNullException(nameof(request.Nombre)),
+                Telefono =
+                    request.Telefono ?? throw new ArgumentNullException(nameof(request.Telefono)),
+                Email = request.Email,
+                VehiculoPlaca =
+                    request.VehiculoPlaca
+                    ?? throw new ArgumentNullException(nameof(request.VehiculoPlaca)),
+                Password = _passwordService.HashPassword(
+                    request.Password ?? throw new ArgumentNullException(nameof(request.Password))
+                ),
+                FechaRegistro = DateTime.Now,
+            };
+
             _context.Clientes.Add(cliente);
             await _context.SaveChangesAsync();
 
@@ -194,13 +238,14 @@ namespace FinalMarzo.net.Controllers
         )
         {
             if (string.IsNullOrEmpty(request.Email))
-                return BadRequest("El email es obligatorio.");
+                return BadRequest("Email is required.");
 
             var cliente = await _context.Clientes.FirstOrDefaultAsync(c =>
                 c.Email == request.Email
             );
+
             if (cliente == null)
-                return NotFound("No existe un cliente con ese correo.");
+                return NotFound("No account was found with this email.");
 
             string resetToken = Guid.NewGuid().ToString();
             cliente.ResetToken = resetToken;
@@ -208,11 +253,10 @@ namespace FinalMarzo.net.Controllers
 
             await _context.SaveChangesAsync();
 
-            string subject = "Recuperación de Contraseña";
+            string subject = "Password Recovery";
             string body =
-                $"Hola {cliente.Nombre},\n\nHaz clic en el siguiente enlace para restablecer tu contraseña:\n\n"
-                + $"http://localhost:3000/reset-password?token={resetToken}\n\n"
-                + "Si no solicitaste este cambio, ignora este mensaje.";
+                $"Hello, click the following link to reset your password:\n\n"
+                + $"http://localhost:3000/reset-password?token={resetToken}";
 
             if (cliente.Email != null)
             {
@@ -220,10 +264,10 @@ namespace FinalMarzo.net.Controllers
             }
             else
             {
-                return BadRequest("El cliente no tiene un correo electrónico registrado.");
+                return BadRequest("The client's email is null.");
             }
 
-            return Ok("Se ha enviado un correo con instrucciones para recuperar tu contraseña.");
+            return Ok("An email with password reset instructions has been sent.");
         }
 
         [HttpPost("restablecer-password")]
