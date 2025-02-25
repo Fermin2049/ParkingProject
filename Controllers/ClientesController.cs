@@ -3,6 +3,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using FinalMarzo.net.Data;
+using FinalMarzo.net.Data.Models;
 using FinalMarzo.net.Models;
 using FinalMarzo.net.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -200,8 +201,6 @@ namespace FinalMarzo.net.Controllers
 
             var cliente = await _context
                 .Clientes.Include(c => c.Reservas)
-                .Include(c => c.Pagos)
-                .Include(c => c.Historialestacionamientos)
                 .FirstOrDefaultAsync(c => c.Email == email);
 
             if (cliente == null)

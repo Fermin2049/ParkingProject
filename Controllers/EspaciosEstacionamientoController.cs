@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FinalMarzo.net.Data;
+using FinalMarzo.net.Data.Models;
 using FinalMarzo.net.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinalMarzo.net.Controllers
 {
-    [Authorize] // 🔹 Todos los endpoints requieren autenticación
+    [Authorize] // Todos los endpoints requieren autenticación
     [Route("api/[controller]")]
     [ApiController]
     public class EspaciosEstacionamientoController : ControllerBase
@@ -21,7 +23,7 @@ namespace FinalMarzo.net.Controllers
             _context = context;
         }
 
-        // ✅ Obtener todos los espacios (Administradores y Empleados)
+        // Obtener todos los espacios (Administradores y Empleados)
         [HttpGet]
         [Authorize(Roles = "Administrador,Empleado")]
         public async Task<
@@ -31,22 +33,20 @@ namespace FinalMarzo.net.Controllers
             return await _context.Espaciosestacionamientos.ToListAsync();
         }
 
-        // ✅ Obtener un espacio específico (Administradores y Empleados)
+        // Obtener un espacio específico (Administradores y Empleados)
         [HttpGet("{id}")]
         [Authorize(Roles = "Administrador,Empleado")]
         public async Task<ActionResult<Espaciosestacionamiento>> GetEspacioEstacionamiento(int id)
         {
             var espacio = await _context.Espaciosestacionamientos.FindAsync(id);
-
             if (espacio == null)
             {
                 return NotFound("El espacio de estacionamiento no fue encontrado.");
             }
-
             return espacio;
         }
 
-        // ✅ Crear un nuevo espacio (Solo Administradores)
+        // Crear un nuevo espacio (Solo Administradores)
         [HttpPost]
         [Authorize(Roles = "Administrador")]
         public async Task<ActionResult<Espaciosestacionamiento>> PostEspacioEstacionamiento(
@@ -73,7 +73,7 @@ namespace FinalMarzo.net.Controllers
             );
         }
 
-        // ✅ Actualizar un espacio (Solo Administradores)
+        // Actualizar un espacio (Solo Administradores)
         [HttpPut("{id}")]
         [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> PutEspacioEstacionamiento(
@@ -92,22 +92,20 @@ namespace FinalMarzo.net.Controllers
                 return NotFound("El espacio de estacionamiento no fue encontrado.");
             }
 
-            // Actualizar los campos del espacio existente
+            // Actualizar los campos del espacio existente (sin el campo Estado)
             espacioExistente.NumeroEspacio = espacio.NumeroEspacio;
-            espacioExistente.Estado = espacio.Estado;
             espacioExistente.TipoEspacio = espacio.TipoEspacio;
             espacioExistente.Sector = espacio.Sector;
             espacioExistente.FechaActualizacion = DateTime.Now;
 
             _context.Entry(espacioExistente).State = EntityState.Modified;
-
             try
             {
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!_context.Espaciosestacionamientos.Any(e => e.IdEspacio == id))
+                if (!await _context.Espaciosestacionamientos.AnyAsync(e => e.IdEspacio == id))
                 {
                     return NotFound("El espacio de estacionamiento no existe.");
                 }
@@ -116,11 +114,10 @@ namespace FinalMarzo.net.Controllers
                     throw;
                 }
             }
-
             return NoContent();
         }
 
-        // ✅ Eliminar un espacio (Solo Administradores)
+        // Eliminar un espacio (Solo Administradores)
         [HttpDelete("{id}")]
         [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> DeleteEspacioEstacionamiento(int id)
@@ -131,16 +128,34 @@ namespace FinalMarzo.net.Controllers
                 return NotFound("El espacio de estacionamiento no fue encontrado.");
             }
 
-            // Verificar que el espacio no esté reservado u ocupado
-            if (espacio.Estado == "Reservado" || espacio.Estado == "Ocupado")
+            // Verificar que el espacio no tenga una reserva activa
+            bool tieneReservaActiva = await _context.Reservas.AnyAsync(r =>
+                r.IdEspacio == id && r.Estado == "Activa"
+            );
+            if (tieneReservaActiva)
             {
-                return BadRequest("No se puede eliminar un espacio reservado u ocupado.");
+                return BadRequest("No se puede eliminar un espacio con una reserva activa.");
             }
 
             _context.Espaciosestacionamientos.Remove(espacio);
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // Obtener solo los espacios disponibles (sin reservas activas)
+        [HttpGet("disponibles")]
+        [Authorize(Roles = "Administrador,Empleado,Cliente")]
+        public async Task<
+            ActionResult<IEnumerable<Espaciosestacionamiento>>
+        > GetEspaciosDisponibles()
+        {
+            var espaciosDisponibles = await _context
+                .Espaciosestacionamientos.Where(e =>
+                    !_context.Reservas.Any(r => r.IdEspacio == e.IdEspacio && r.Estado == "Activa")
+                )
+                .ToListAsync();
+            return Ok(espaciosDisponibles);
         }
     }
 }

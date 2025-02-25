@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using FinalMarzo.net.Data;
+using FinalMarzo.net.Data.Models;
 using FinalMarzo.net.Models;
 using FinalMarzo.net.Services;
 using Google.Apis.Auth;
@@ -35,7 +36,7 @@ namespace FinalMarzo.net.Controllers
             _emailService = emailService;
         }
 
-        // ✅ LOGIN CLIENTE
+        // ✅ LOGIN CLIENTE (USUARIO)
         [HttpPost("login-cliente")] // 🔹 URL: /api/auth/login-cliente
         public async Task<IActionResult> LoginCliente([FromBody] LoginRequest model)
         {

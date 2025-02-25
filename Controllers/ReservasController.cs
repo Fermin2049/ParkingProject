@@ -3,6 +3,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using FinalMarzo.net.Data;
+using FinalMarzo.net.Data.Models;
 using FinalMarzo.net.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinalMarzo.net.Controllers
 {
-    [Authorize] // 🔹 Todos los endpoints requieren autenticación
+    [Authorize] // Todos los endpoints requieren autenticación
     [Route("api/[controller]")]
     [ApiController]
     public class ReservasController : ControllerBase
@@ -22,7 +23,7 @@ namespace FinalMarzo.net.Controllers
             _context = context;
         }
 
-        // ✅ Obtener todas las reservas (Solo Administradores y Empleados)
+        // Obtener todas las reservas (Solo Administradores y Empleados)
         [HttpGet]
         [Authorize(Roles = "Administrador,Empleado")]
         public async Task<ActionResult<IEnumerable<Reserva>>> GetReservas()
@@ -33,7 +34,7 @@ namespace FinalMarzo.net.Controllers
                 .ToListAsync();
         }
 
-        // ✅ Obtener reservas de un cliente específico (Solo Administradores y Empleados)
+        // Obtener reservas de un cliente específico (Solo Administradores y Empleados)
         [HttpGet("cliente/{idCliente}")]
         [Authorize(Roles = "Administrador,Empleado")]
         public async Task<ActionResult<IEnumerable<Reserva>>> GetReservasByCliente(int idCliente)
@@ -51,7 +52,7 @@ namespace FinalMarzo.net.Controllers
             return reservas;
         }
 
-        // ✅ Obtener reservas del cliente autenticado
+        // Obtener reservas del cliente autenticado
         [HttpGet("me")]
         [Authorize(Roles = "Cliente")]
         public async Task<ActionResult<IEnumerable<Reserva>>> GetMyReservas()
@@ -72,7 +73,7 @@ namespace FinalMarzo.net.Controllers
             return reservas;
         }
 
-        // ✅ Obtener una reserva específica (Solo Administradores, Empleados y Cliente Propietario)
+        // Obtener una reserva específica (Solo Administradores, Empleados y Cliente Propietario)
         [HttpGet("{id}")]
         public async Task<ActionResult<Reserva>> GetReserva(int id)
         {
@@ -101,7 +102,7 @@ namespace FinalMarzo.net.Controllers
             return reserva;
         }
 
-        // ✅ Crear una nueva reserva (Solo Clientes)
+        // Crear una nueva reserva (Solo Clientes)
         [HttpPost]
         [Authorize(Roles = "Cliente")]
         public async Task<ActionResult<Reserva>> PostReserva(Reserva reserva)
@@ -114,32 +115,38 @@ namespace FinalMarzo.net.Controllers
             if (cliente == null)
                 return NotFound("Cliente no encontrado.");
 
-            // Verificar que el espacio esté disponible
-            var espacio = await _context.Espaciosestacionamientos.FirstOrDefaultAsync(e =>
-                e.IdEspacio == reserva.IdEspacio && e.Estado == "Disponible"
-            );
+            // Verificar que el espacio exista
+            var espacio = await _context.Espaciosestacionamientos.FindAsync(reserva.IdEspacio);
             if (espacio == null)
             {
-                return BadRequest("El espacio no está disponible.");
+                return NotFound("Espacio no encontrado.");
+            }
+
+            // Verificar que el espacio esté disponible (sin una reserva activa)
+            bool tieneReservaActiva = await _context.Reservas.AnyAsync(r =>
+                r.IdEspacio == reserva.IdEspacio && r.Estado == "Activa"
+            );
+            if (tieneReservaActiva)
+            {
+                return BadRequest("El espacio ya tiene una reserva activa.");
             }
 
             reserva.IdCliente = cliente.IdCliente;
             reserva.Estado = "Activa";
 
             _context.Reservas.Add(reserva);
-            espacio.Estado = "Reservado"; // Marcar espacio como reservado
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetReserva), new { id = reserva.IdReserva }, reserva);
         }
 
-        // ✅ Modificar una reserva (Solo Clientes dueños de la reserva)
+        // Modificar una reserva (Solo Clientes dueños de la reserva)
         [HttpPut("{id}")]
         [Authorize(Roles = "Cliente")]
         public async Task<IActionResult> PutReserva(int id, Reserva reserva)
         {
             if (id != reserva.IdReserva)
-                return BadRequest();
+                return BadRequest("El ID de la reserva no coincide.");
 
             var email = User.FindFirst(ClaimTypes.Name)?.Value;
             if (email == null)
@@ -167,7 +174,7 @@ namespace FinalMarzo.net.Controllers
             return NoContent();
         }
 
-        // ✅ Cancelar o eliminar una reserva (Clientes pueden cancelar su reserva, Administradores pueden eliminar cualquier reserva)
+        // Cancelar o eliminar una reserva (Clientes pueden cancelar su reserva, Administradores pueden eliminar cualquier reserva)
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteReserva(int id)
         {
@@ -185,14 +192,6 @@ namespace FinalMarzo.net.Controllers
             )
             {
                 return Forbid();
-            }
-
-            var espacio = await _context.Espaciosestacionamientos.FirstOrDefaultAsync(e =>
-                e.IdEspacio == reserva.IdEspacio
-            );
-            if (espacio != null)
-            {
-                espacio.Estado = "Disponible"; // Liberar el espacio
             }
 
             _context.Reservas.Remove(reserva);

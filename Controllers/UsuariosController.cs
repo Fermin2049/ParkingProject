@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FinalMarzo.net.Data;
+using FinalMarzo.net.Data.Models;
 using FinalMarzo.net.Models;
 using FinalMarzo.net.Services;
 using Microsoft.AspNetCore.Authorization;
