@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using FinalMarzo.net.Data;
-using FinalMarzo.net.Middlewares; // Importar los Middlewares
+using FinalMarzo.net.Middlewares;
 using FinalMarzo.net.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -105,6 +105,9 @@ builder.Services.AddScoped<EmailService>(sp => new EmailService(
     sp.GetRequiredService<ILogger<EmailService>>()
 ));
 
+// Agregar el servicio de limpieza automática de reservas
+builder.Services.AddHostedService<ReservaCleanupService>();
+
 // Construir la aplicación
 var app = builder.Build();
 
@@ -127,8 +130,8 @@ app.UseMiddleware<LoggingMiddleware>(); // Middleware para logging
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseCors("AllowAllOrigins");
-app.UseAuthentication(); // Autenticación habilitada
-app.UseAuthorization(); // Autorización habilitada
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Mapear controladores
 app.MapControllers();
@@ -165,6 +168,13 @@ app.MapGet(
     )
     .WithName("GetWeatherForecast")
     .WithOpenApi();
+
+// Asegurar que la base de datos se cree y las migraciones se apliquen
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+    dbContext.Database.Migrate();
+}
 
 app.Run();
 

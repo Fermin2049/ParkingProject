@@ -115,24 +115,24 @@ namespace FinalMarzo.net.Controllers
             if (cliente == null)
                 return NotFound("Cliente no encontrado.");
 
-            // Verificar que el espacio exista
-            var espacio = await _context.Espaciosestacionamientos.FindAsync(reserva.IdEspacio);
+            var espacio = await _context.EspaciosEstacionamiento.FindAsync(reserva.IdEspacio);
             if (espacio == null)
-            {
                 return NotFound("Espacio no encontrado.");
-            }
 
-            // Verificar que el espacio esté disponible (sin una reserva activa)
+            // Verificar que el espacio no esté ocupado ni reservado
             bool tieneReservaActiva = await _context.Reservas.AnyAsync(r =>
-                r.IdEspacio == reserva.IdEspacio && r.Estado == "Activa"
+                r.IdEspacio == reserva.IdEspacio
+                && (r.Estado == "Activa" || r.Estado == "EnProceso")
             );
             if (tieneReservaActiva)
             {
-                return BadRequest("El espacio ya tiene una reserva activa.");
+                return BadRequest(
+                    "El espacio ya tiene una reserva activa o está en proceso de pago."
+                );
             }
 
             reserva.IdCliente = cliente.IdCliente;
-            reserva.Estado = "Activa";
+            reserva.Estado = "EnProceso"; // 🔹 Se marca como "EnProceso" mientras paga
 
             _context.Reservas.Add(reserva);
             await _context.SaveChangesAsync();
@@ -198,6 +198,75 @@ namespace FinalMarzo.net.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // Endpoint para obtener los espacios disponibles en un rango de fechas y opcionalmente filtrados por tipo.
+        [HttpGet("disponibles")]
+        [Authorize]
+        public async Task<
+            ActionResult<IEnumerable<Espaciosestacionamiento>>
+        > GetEspaciosDisponibles(
+            [FromQuery] string fechaInicio,
+            [FromQuery] string fechaFin,
+            [FromQuery] string? tipo
+        )
+        {
+            if (
+                !DateTime.TryParseExact(
+                    fechaInicio,
+                    "yyyy-MM-dd'T'HH:mm:ss",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out DateTime fi
+                )
+            )
+            {
+                return BadRequest("Formato incorrecto para fecha de inicio.");
+            }
+            if (
+                !DateTime.TryParseExact(
+                    fechaFin,
+                    "yyyy-MM-dd'T'HH:mm:ss",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out DateTime ff
+                )
+            )
+            {
+                return BadRequest("Formato incorrecto para fecha de fin.");
+            }
+
+            if (fi < DateTime.Now)
+            {
+                return BadRequest("La fecha de inicio debe ser en el futuro.");
+            }
+            if (ff <= fi)
+            {
+                return BadRequest("La fecha de fin debe ser posterior a la de inicio.");
+            }
+
+            var query = _context.EspaciosEstacionamiento.AsQueryable();
+
+            if (!string.IsNullOrEmpty(tipo))
+            {
+                query = query.Where(e =>
+                    e.TipoEspacio != null && e.TipoEspacio.ToLower() == tipo.ToLower()
+                );
+            }
+
+            // 🔹 Excluir espacios que están reservados o en proceso
+            var espaciosDisponibles = await query
+                .Where(e =>
+                    !_context.Reservas.Any(r =>
+                        r.IdEspacio == e.IdEspacio
+                        && (r.Estado == "Activa" || r.Estado == "EnProceso")
+                        && r.FechaReserva < ff
+                        && r.FechaExpiracion > fi
+                    )
+                )
+                .ToListAsync();
+
+            return Ok(espaciosDisponibles);
         }
     }
 }

@@ -30,7 +30,7 @@ namespace FinalMarzo.net.Controllers
             ActionResult<IEnumerable<Espaciosestacionamiento>>
         > GetEspaciosEstacionamiento()
         {
-            return await _context.Espaciosestacionamientos.ToListAsync();
+            return await _context.EspaciosEstacionamiento.ToListAsync();
         }
 
         // Obtener un espacio específico (Administradores y Empleados)
@@ -38,7 +38,7 @@ namespace FinalMarzo.net.Controllers
         [Authorize(Roles = "Administrador,Empleado")]
         public async Task<ActionResult<Espaciosestacionamiento>> GetEspacioEstacionamiento(int id)
         {
-            var espacio = await _context.Espaciosestacionamientos.FindAsync(id);
+            var espacio = await _context.EspaciosEstacionamiento.FindAsync(id);
             if (espacio == null)
             {
                 return NotFound("El espacio de estacionamiento no fue encontrado.");
@@ -55,7 +55,7 @@ namespace FinalMarzo.net.Controllers
         {
             // Validar si el número de espacio ya existe
             if (
-                await _context.Espaciosestacionamientos.AnyAsync(e =>
+                await _context.EspaciosEstacionamiento.AnyAsync(e =>
                     e.NumeroEspacio == espacio.NumeroEspacio
                 )
             )
@@ -63,7 +63,7 @@ namespace FinalMarzo.net.Controllers
                 return BadRequest("El número de espacio ya está en uso.");
             }
 
-            _context.Espaciosestacionamientos.Add(espacio);
+            _context.EspaciosEstacionamiento.Add(espacio);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(
@@ -86,7 +86,7 @@ namespace FinalMarzo.net.Controllers
                 return BadRequest("El ID del espacio no coincide.");
             }
 
-            var espacioExistente = await _context.Espaciosestacionamientos.FindAsync(id);
+            var espacioExistente = await _context.EspaciosEstacionamiento.FindAsync(id);
             if (espacioExistente == null)
             {
                 return NotFound("El espacio de estacionamiento no fue encontrado.");
@@ -105,7 +105,7 @@ namespace FinalMarzo.net.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!await _context.Espaciosestacionamientos.AnyAsync(e => e.IdEspacio == id))
+                if (!await _context.EspaciosEstacionamiento.AnyAsync(e => e.IdEspacio == id))
                 {
                     return NotFound("El espacio de estacionamiento no existe.");
                 }
@@ -122,7 +122,7 @@ namespace FinalMarzo.net.Controllers
         [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> DeleteEspacioEstacionamiento(int id)
         {
-            var espacio = await _context.Espaciosestacionamientos.FindAsync(id);
+            var espacio = await _context.EspaciosEstacionamiento.FindAsync(id);
             if (espacio == null)
             {
                 return NotFound("El espacio de estacionamiento no fue encontrado.");
@@ -137,7 +137,7 @@ namespace FinalMarzo.net.Controllers
                 return BadRequest("No se puede eliminar un espacio con una reserva activa.");
             }
 
-            _context.Espaciosestacionamientos.Remove(espacio);
+            _context.EspaciosEstacionamiento.Remove(espacio);
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -151,7 +151,7 @@ namespace FinalMarzo.net.Controllers
         > GetEspaciosDisponibles()
         {
             var espaciosDisponibles = await _context
-                .Espaciosestacionamientos.Where(e =>
+                .EspaciosEstacionamiento.Where(e =>
                     !_context.Reservas.Any(r => r.IdEspacio == e.IdEspacio && r.Estado == "Activa")
                 )
                 .ToListAsync();
