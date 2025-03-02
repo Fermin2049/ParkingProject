@@ -8,6 +8,7 @@ using FinalMarzo.net.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace FinalMarzo.net.Controllers
 {
@@ -17,10 +18,12 @@ namespace FinalMarzo.net.Controllers
     public class ReservasController : ControllerBase
     {
         private readonly MyDbContext _context;
+        private readonly ILogger<ReservasController> _logger;
 
-        public ReservasController(MyDbContext context)
+        public ReservasController(MyDbContext context, ILogger<ReservasController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         // Obtener todas las reservas (Solo Administradores y Empleados)
@@ -107,17 +110,53 @@ namespace FinalMarzo.net.Controllers
         [Authorize(Roles = "Cliente")]
         public async Task<ActionResult<Reserva>> PostReserva(Reserva reserva)
         {
+            // Imprimir en consola y loguear el objeto recibido
+            _logger.LogInformation("PostReserva: Reserva recibida: {@Reserva}", reserva);
+            Console.WriteLine(
+                "PostReserva: Reserva recibida: "
+                    + Newtonsoft.Json.JsonConvert.SerializeObject(reserva)
+            );
+
+            // Validar ModelState y registrar errores en consola
+            if (!ModelState.IsValid)
+            {
+                var errores = string.Join(
+                    "; ",
+                    ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)
+                );
+                _logger.LogWarning("PostReserva: ModelState inválido: {Errores}", errores);
+                Console.WriteLine("PostReserva: ModelState inválido: " + errores);
+                return BadRequest(ModelState);
+            }
+
             var email = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (email == null)
+            if (string.IsNullOrEmpty(email))
+            {
+                _logger.LogWarning("PostReserva: No se encontró el email en el token.");
+                Console.WriteLine("PostReserva: No se encontró el email en el token.");
                 return Unauthorized();
+            }
 
             var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Email == email);
             if (cliente == null)
+            {
+                _logger.LogWarning("PostReserva: Cliente no encontrado para email {Email}", email);
+                Console.WriteLine("PostReserva: Cliente no encontrado para email: " + email);
                 return NotFound("Cliente no encontrado.");
+            }
 
             var espacio = await _context.EspaciosEstacionamiento.FindAsync(reserva.IdEspacio);
             if (espacio == null)
+            {
+                _logger.LogWarning(
+                    "PostReserva: Espacio no encontrado para IdEspacio {IdEspacio}",
+                    reserva.IdEspacio
+                );
+                Console.WriteLine(
+                    "PostReserva: Espacio no encontrado para IdEspacio: " + reserva.IdEspacio
+                );
                 return NotFound("Espacio no encontrado.");
+            }
 
             // Verificar que el espacio no esté ocupado ni reservado
             bool tieneReservaActiva = await _context.Reservas.AnyAsync(r =>
@@ -126,16 +165,65 @@ namespace FinalMarzo.net.Controllers
             );
             if (tieneReservaActiva)
             {
+                _logger.LogWarning(
+                    "PostReserva: El espacio {IdEspacio} ya tiene una reserva activa o en proceso.",
+                    reserva.IdEspacio
+                );
+                Console.WriteLine(
+                    "PostReserva: El espacio "
+                        + reserva.IdEspacio
+                        + " ya tiene una reserva activa o en proceso."
+                );
                 return BadRequest(
                     "El espacio ya tiene una reserva activa o está en proceso de pago."
                 );
             }
 
             reserva.IdCliente = cliente.IdCliente;
-            reserva.Estado = "EnProceso"; // 🔹 Se marca como "EnProceso" mientras paga
+            reserva.Estado = "EnProceso"; // Se marca como "EnProceso" mientras se paga
 
-            _context.Reservas.Add(reserva);
-            await _context.SaveChangesAsync();
+            // Asignar valores por defecto para fechas si no se han proporcionado
+            if (reserva.FechaReserva == default)
+            {
+                reserva.FechaReserva = System.DateTime.UtcNow;
+                _logger.LogInformation(
+                    "PostReserva: FechaReserva no proporcionada, se asigna UTC now: {FechaReserva}",
+                    reserva.FechaReserva
+                );
+                Console.WriteLine(
+                    "PostReserva: FechaReserva no proporcionada, se asigna UTC now: "
+                        + reserva.FechaReserva
+                );
+            }
+            if (reserva.FechaExpiracion == default)
+            {
+                reserva.FechaExpiracion = reserva.FechaReserva.AddMinutes(10);
+                _logger.LogInformation(
+                    "PostReserva: FechaExpiracion no proporcionada, se asigna 10 minutos después: {FechaExpiracion}",
+                    reserva.FechaExpiracion
+                );
+                Console.WriteLine(
+                    "PostReserva: FechaExpiracion no proporcionada, se asigna 10 minutos después: "
+                        + reserva.FechaExpiracion
+                );
+            }
+
+            try
+            {
+                _context.Reservas.Add(reserva);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation(
+                    "PostReserva: Reserva creada con IdReserva {IdReserva}",
+                    reserva.IdReserva
+                );
+                Console.WriteLine("PostReserva: Reserva creada con IdReserva " + reserva.IdReserva);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "PostReserva: Exception al guardar la reserva");
+                Console.WriteLine("PostReserva: Exception al guardar la reserva: " + ex.ToString());
+                return BadRequest("Error al registrar la reserva.");
+            }
 
             return CreatedAtAction(nameof(GetReserva), new { id = reserva.IdReserva }, reserva);
         }
@@ -212,31 +300,31 @@ namespace FinalMarzo.net.Controllers
         )
         {
             if (
-                !DateTime.TryParseExact(
+                !System.DateTime.TryParseExact(
                     fechaInicio,
                     "yyyy-MM-dd'T'HH:mm:ss",
                     System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.None,
-                    out DateTime fi
+                    out System.DateTime fi
                 )
             )
             {
                 return BadRequest("Formato incorrecto para fecha de inicio.");
             }
             if (
-                !DateTime.TryParseExact(
+                !System.DateTime.TryParseExact(
                     fechaFin,
                     "yyyy-MM-dd'T'HH:mm:ss",
                     System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.None,
-                    out DateTime ff
+                    out System.DateTime ff
                 )
             )
             {
                 return BadRequest("Formato incorrecto para fecha de fin.");
             }
 
-            if (fi < DateTime.Now)
+            if (fi < System.DateTime.Now)
             {
                 return BadRequest("La fecha de inicio debe ser en el futuro.");
             }
@@ -254,14 +342,17 @@ namespace FinalMarzo.net.Controllers
                 );
             }
 
-            // 🔹 Excluir espacios que están reservados o en proceso
+            // Modificamos la condición para:
+            // - Excluir siempre los espacios que tienen una reserva en proceso (sin importar fechas).
+            // - Para reservas activas, seguir evaluando el cruce de intervalos.
             var espaciosDisponibles = await query
                 .Where(e =>
                     !_context.Reservas.Any(r =>
                         r.IdEspacio == e.IdEspacio
-                        && (r.Estado == "Activa" || r.Estado == "EnProceso")
-                        && r.FechaReserva < ff
-                        && r.FechaExpiracion > fi
+                        && (
+                            (r.Estado == "Activa" && r.FechaReserva < ff && r.FechaExpiracion > fi)
+                            || r.Estado == "EnProceso"
+                        )
                     )
                 )
                 .ToListAsync();

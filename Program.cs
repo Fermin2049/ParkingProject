@@ -19,6 +19,12 @@ builder.Services.AddDbContext<MyDbContext>(options =>
     )
 );
 
+// Configurar HTTPS redirection indicando explícitamente el puerto HTTPS (7206)
+builder.Services.AddHttpsRedirection(options =>
+{
+    options.HttpsPort = 7206;
+});
+
 // Configurar JWT
 var secretKey = builder.Configuration["TokenAuthentication:SecretKey"];
 if (string.IsNullOrEmpty(secretKey))
