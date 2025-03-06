@@ -253,8 +253,19 @@ namespace FinalMarzo.net.Controllers
                 return NotFound("Reserva no encontrada.");
             }
 
-            existingReserva.FechaReserva = reserva.FechaReserva;
-            existingReserva.FechaExpiracion = reserva.FechaExpiracion;
+            // Solo actualizamos las fechas si se enviaron valores distintos al valor por defecto.
+            if (reserva.FechaReserva != default(DateTime))
+            {
+                existingReserva.FechaReserva = reserva.FechaReserva;
+            }
+
+            if (reserva.FechaExpiracion != default(DateTime))
+            {
+                existingReserva.FechaExpiracion = reserva.FechaExpiracion;
+            }
+
+            // Actualizamos el estado siempre
+            existingReserva.Estado = reserva.Estado;
 
             _context.Entry(existingReserva).State = EntityState.Modified;
             await _context.SaveChangesAsync();
@@ -342,16 +353,21 @@ namespace FinalMarzo.net.Controllers
                 );
             }
 
-            // Modificamos la condición para:
-            // - Excluir siempre los espacios que tienen una reserva en proceso (sin importar fechas).
-            // - Para reservas activas, seguir evaluando el cruce de intervalos.
+            // Aquí se modifica la condición:
+            // Se excluyen los espacios que tienen una reserva con estado "EnProceso"
+            // O que tienen una reserva con estado "Activa" cuyo intervalo [FechaReserva, FechaExpiracion]
+            // se solape con el intervalo solicitado [fi, ff]
             var espaciosDisponibles = await query
                 .Where(e =>
                     !_context.Reservas.Any(r =>
                         r.IdEspacio == e.IdEspacio
                         && (
-                            (r.Estado == "Activa" && r.FechaReserva < ff && r.FechaExpiracion > fi)
-                            || r.Estado == "EnProceso"
+                            r.Estado == "EnProceso"
+                            || (
+                                r.Estado == "Activa"
+                                && r.FechaReserva <= ff
+                                && r.FechaExpiracion >= fi
+                            )
                         )
                     )
                 )
