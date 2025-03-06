@@ -284,7 +284,9 @@ namespace FinalMarzo.net.Controllers
             if (cliente == null || cliente.ResetTokenExpiry < DateTime.UtcNow)
                 return BadRequest("El token es inválido o ha expirado.");
 
-            cliente.Password = request.NewPassword; // Deberías encriptar esta contraseña
+            // 🔐 Encriptación de la nueva contraseña antes de guardarla
+            cliente.Password = _passwordService.HashPassword(request.NewPassword);
+
             cliente.ResetToken = null;
             cliente.ResetTokenExpiry = null;
 
